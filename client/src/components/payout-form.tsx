@@ -34,7 +34,6 @@ interface PayoutFormProps {
 export function PayoutForm({ country, providers }: PayoutFormProps) {
   const [transactionId, setTransactionId] = useState<string>('');
   const [status, setStatus] = useState<string>('Ready');
-  const [response, setResponse] = useState<string>('{\n  "message": "Click \'Initiate Payout\' to see API response"\n}');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -86,7 +85,6 @@ export function PayoutForm({ country, providers }: PayoutFormProps) {
     onSuccess: (data) => {
       setTransactionId(data.transactionId);
       setStatus(data.status || 'ACCEPTED');
-      setResponse(JSON.stringify(data, null, 2));
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       
       toast({
@@ -100,7 +98,6 @@ export function PayoutForm({ country, providers }: PayoutFormProps) {
           pawaPayService.checkPayoutStatus(data.transactionId)
             .then((statusData) => {
               setStatus(statusData.status);
-              setResponse(JSON.stringify(statusData, null, 2));
               
               if (statusData.status === 'COMPLETED' || statusData.status === 'FAILED') {
                 queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
@@ -122,7 +119,6 @@ export function PayoutForm({ country, providers }: PayoutFormProps) {
     },
     onError: (error) => {
       setStatus('FAILED');
-      setResponse(JSON.stringify({ error: error.message }, null, 2));
       
       toast({
         title: "Payout Failed",
@@ -136,18 +132,9 @@ export function PayoutForm({ country, providers }: PayoutFormProps) {
     payoutMutation.mutate(data);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'COMPLETED': return 'bg-green-100 text-green-800 border-green-300';
-      case 'PENDING': 
-      case 'ACCEPTED': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'FAILED': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="max-w-2xl mx-auto">
       {/* Payout Form */}
       <Card data-testid="payout-form">
         <CardContent className="p-6">
@@ -246,45 +233,6 @@ export function PayoutForm({ country, providers }: PayoutFormProps) {
               {isSubmitting ? 'Initiating...' : 'Initiate Payout'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
-
-      {/* API Response */}
-      <Card data-testid="payout-response">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">API Response</h3>
-          <div className="space-y-4">
-            <div className="bg-muted rounded-md p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">Status</span>
-                <span 
-                  data-testid="payout-status"
-                  className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(status)}`}
-                >
-                  {status}
-                </span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <span>Transaction ID: </span>
-                <code 
-                  data-testid="payout-transaction-id"
-                  className="text-xs bg-background px-2 py-1 rounded"
-                >
-                  {transactionId || '-'}
-                </code>
-              </div>
-            </div>
-
-            <div>
-              <Label>Full Response</Label>
-              <pre 
-                data-testid="payout-response-json"
-                className="bg-slate-900 text-slate-100 text-xs p-3 rounded-md border border-border overflow-x-auto min-h-[200px] font-mono"
-              >
-                {response}
-              </pre>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
