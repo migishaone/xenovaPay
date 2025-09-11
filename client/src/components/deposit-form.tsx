@@ -110,13 +110,21 @@ export function DepositForm({ country }: DepositFormProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto">
-      <Card data-testid="payment-form">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Receive Payment</h3>
+    <div className="max-w-lg mx-auto slide-up">
+      <Card data-testid="payment-form" className="glass-card border-0 shadow-2xl overflow-hidden">
+        <CardContent className="p-8 relative">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600"></div>
+          <div className="text-center mb-8">
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-purple-500 to-indigo-600 bg-clip-text text-transparent mb-2">
+              Receive Payment
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              Safe & secure mobile money payments
+            </p>
+          </div>
           
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <Label htmlFor="deposit-phone">Phone Number</Label>
               <div className="flex">
@@ -191,11 +199,11 @@ export function DepositForm({ country }: DepositFormProps) {
             <Button 
               type="submit" 
               data-testid="button-pay-now"
-              className="w-full" 
+              className="w-full gradient-button h-14 text-lg font-semibold rounded-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300" 
               disabled={!country || isSubmitting}
             >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Processing...' : 'Pay Now'}
+              <ExternalLink className="mr-3 h-5 w-5" />
+              <span>{isSubmitting ? 'Processing...' : 'Pay Now'}</span>
             </Button>
           </form>
         </CardContent>

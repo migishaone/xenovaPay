@@ -3,55 +3,61 @@
 @tailwind utilities;
 
 :root {
-  --background: hsl(220, 14%, 96%);
-  --foreground: hsl(220, 13%, 13%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(220, 13%, 13%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(220, 13%, 13%);
-  --primary: hsl(221, 83%, 53%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(220, 13%, 91%);
-  --secondary-foreground: hsl(220, 9%, 46%);
-  --muted: hsl(220, 13%, 91%);
-  --muted-foreground: hsl(220, 9%, 46%);
-  --accent: hsl(221, 83%, 53%);
-  --accent-foreground: hsl(0, 0%, 98%);
+  --background: linear-gradient(135deg, hsl(255, 30%, 98%) 0%, hsl(260, 40%, 96%) 100%);
+  --foreground: hsl(260, 20%, 12%);
+  --card: hsla(0, 0%, 100%, 0.9);
+  --card-foreground: hsl(260, 20%, 12%);
+  --popover: hsla(0, 0%, 100%, 0.95);
+  --popover-foreground: hsl(260, 20%, 12%);
+  --primary: linear-gradient(135deg, hsl(260, 100%, 65%) 0%, hsl(280, 100%, 75%) 100%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(260, 30%, 92%);
+  --secondary-foreground: hsl(260, 15%, 45%);
+  --muted: hsl(260, 20%, 94%);
+  --muted-foreground: hsl(260, 10%, 50%);
+  --accent: linear-gradient(135deg, hsl(270, 80%, 60%) 0%, hsl(290, 90%, 70%) 100%);
+  --accent-foreground: hsl(0, 0%, 100%);
   --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(220, 13%, 87%);
-  --input: hsl(220, 13%, 87%);
-  --ring: hsl(221, 83%, 53%);
+  --border: hsl(260, 20%, 88%);
+  --input: hsla(260, 20%, 100%, 0.8);
+  --ring: hsl(270, 80%, 60%);
   --success: hsl(142, 76%, 36%);
   --warning: hsl(38, 92%, 50%);
-  --radius: 0.5rem;
+  --radius: 0.75rem;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "Monaco", "Consolas", monospace;
+  --purple-gradient: linear-gradient(135deg, hsl(260, 100%, 65%) 0%, hsl(280, 100%, 75%) 50%, hsl(300, 90%, 80%) 100%);
+  --purple-glow: linear-gradient(135deg, hsl(260, 100%, 65%) 0%, hsl(280, 100%, 75%) 100%);
+  --glass-bg: hsla(260, 30%, 100%, 0.1);
+  --glass-border: hsla(260, 50%, 80%, 0.2);
 }
 
 .dark {
-  --background: hsl(224, 71%, 4%);
-  --foreground: hsl(213, 31%, 91%);
-  --card: hsl(224, 71%, 7%);
-  --card-foreground: hsl(213, 31%, 91%);
-  --popover: hsl(224, 71%, 7%);
-  --popover-foreground: hsl(213, 31%, 91%);
-  --primary: hsl(221, 83%, 53%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(215, 27%, 17%);
-  --secondary-foreground: hsl(210, 40%, 80%);
-  --muted: hsl(215, 27%, 17%);
-  --muted-foreground: hsl(217, 10%, 64%);
-  --accent: hsl(221, 83%, 53%);
-  --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(0, 63%, 31%);
+  --background: linear-gradient(135deg, hsl(260, 30%, 5%) 0%, hsl(280, 40%, 8%) 100%);
+  --foreground: hsl(260, 15%, 90%);
+  --card: hsla(260, 40%, 10%, 0.8);
+  --card-foreground: hsl(260, 15%, 90%);
+  --popover: hsla(260, 40%, 12%, 0.9);
+  --popover-foreground: hsl(260, 15%, 90%);
+  --primary: linear-gradient(135deg, hsl(260, 100%, 70%) 0%, hsl(280, 100%, 80%) 100%);
+  --primary-foreground: hsl(260, 30%, 5%);
+  --secondary: hsl(260, 30%, 15%);
+  --secondary-foreground: hsl(260, 20%, 70%);
+  --muted: hsl(260, 30%, 12%);
+  --muted-foreground: hsl(260, 15%, 60%);
+  --accent: linear-gradient(135deg, hsl(270, 80%, 65%) 0%, hsl(290, 90%, 75%) 100%);
+  --accent-foreground: hsl(260, 30%, 5%);
+  --destructive: hsl(0, 63%, 50%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(215, 27%, 17%);
-  --input: hsl(215, 27%, 17%);
-  --ring: hsl(221, 83%, 53%);
-  --success: hsl(142, 76%, 36%);
-  --warning: hsl(38, 92%, 50%);
+  --border: hsl(260, 30%, 20%);
+  --input: hsla(260, 30%, 15%, 0.8);
+  --ring: hsl(270, 80%, 65%);
+  --success: hsl(142, 76%, 45%);
+  --warning: hsl(38, 92%, 60%);
+  --glass-bg: hsla(260, 30%, 10%, 0.3);
+  --glass-border: hsla(260, 50%, 60%, 0.2);
 }
 
 @layer base {
@@ -60,8 +66,14 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased text-foreground;
+    background: var(--background);
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 }
 
@@ -81,4 +93,204 @@
   background: hsl(220, 13%, 5%);
   color: hsl(220, 13%, 93%);
   font-family: 'Monaco', 'Consolas', monospace;
+}
+
+/* Modern Animations & Effects */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsla(270, 80%, 60%, 0.3); }
+  50% { box-shadow: 0 0 40px hsla(270, 80%, 60%, 0.6); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Glassmorphism Card Effect */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    0 8px 32px hsla(260, 30%, 0%, 0.1),
+    inset 0 1px 0 hsla(255, 100%, 100%, 0.1);
+}
+
+.dark .glass-card {
+  box-shadow: 
+    0 8px 32px hsla(260, 30%, 0%, 0.3),
+    inset 0 1px 0 hsla(255, 100%, 100%, 0.05);
+}
+
+/* Purple Gradient Button */
+.gradient-button {
+  background: var(--purple-gradient);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+.gradient-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsla(255, 100%, 100%, 0.3),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+.gradient-button:hover {
+  animation: gradient-shift 1s ease infinite, pulse-glow 2s ease-in-out infinite;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px hsla(270, 80%, 60%, 0.3);
+}
+
+/* Tab Animation */
+.tab-trigger {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-trigger::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--purple-gradient);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.tab-trigger[data-state="active"]::before {
+  width: 80%;
+}
+
+.tab-trigger:hover {
+  color: hsl(270, 80%, 60%);
+}
+
+/* Floating Animation */
+.float-animation {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Slide Up Animation */
+.slide-up {
+  animation: slide-up 0.6s ease-out;
+}
+
+/* Scale In Animation */
+.scale-in {
+  animation: scale-in 0.5s ease-out;
+}
+
+/* Status Badge Glow */
+.status-success {
+  background: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(142, 76%, 46%) 100%);
+  box-shadow: 0 4px 15px hsla(142, 76%, 36%, 0.3);
+}
+
+.status-failed {
+  background: linear-gradient(135deg, hsl(0, 84%, 60%) 0%, hsl(0, 84%, 70%) 100%);
+  box-shadow: 0 4px 15px hsla(0, 84%, 60%, 0.3);
+}
+
+.status-pending {
+  background: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(38, 92%, 60%) 100%);
+  box-shadow: 0 4px 15px hsla(38, 92%, 50%, 0.3);
+}
+
+/* Form Field Focus Effect */
+.form-input:focus {
+  box-shadow: 0 0 0 3px hsla(270, 80%, 60%, 0.2);
+  border-color: hsl(270, 80%, 60%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Specific Transition Rules (replaces global rule) */
+.gradient-button,
+.tab-trigger,
+.glass-card,
+input,
+button {
+  transition: all 0.3s ease;
+}
+
+.float-animation,
+.slide-up,
+.scale-in {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Header Gradient Background */
+.header-gradient {
+  background: linear-gradient(
+    135deg,
+    hsla(260, 100%, 65%, 0.1) 0%,
+    hsla(280, 100%, 75%, 0.1) 50%,
+    hsla(300, 90%, 80%, 0.1) 100%
+  );
+  backdrop-filter: blur(10px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--purple-gradient);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
