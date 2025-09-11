@@ -60,14 +60,14 @@ export function TransactionHistory() {
             <div className="text-center py-8">
               <div className="text-sm text-muted-foreground">Loading transactions...</div>
             </div>
-          ) : transactions.length === 0 ? (
+          ) : Array.isArray(transactions) && transactions.length === 0 ? (
             <div className="text-center py-12" data-testid="transactions-empty">
               <ReceiptIcon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h4 className="text-lg font-medium text-foreground mb-2">No transactions yet</h4>
               <p className="text-muted-foreground">Start testing deposits and payouts to see them here</p>
             </div>
           ) : (
-            transactions.map((transaction: any) => (
+            (transactions as any[]).map((transaction: any) => (
               <div
                 key={transaction.id}
                 data-testid={`transaction-${transaction.id}`}

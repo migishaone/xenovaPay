@@ -69,9 +69,9 @@ export function CountrySelector({ onCountrySelect, selectedCountry }: CountrySel
               <div className="text-sm text-muted-foreground">Loading providers...</div>
             ) : error ? (
               <div className="text-sm text-destructive">Failed to load providers</div>
-            ) : providers && providers.length > 0 ? (
+            ) : providers && Array.isArray(providers) && providers.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="providers-list">
-                {providers.map((provider: any) => (
+                {(providers as any[]).map((provider: any) => (
                   <div
                     key={provider.code}
                     data-testid={`provider-${provider.code}`}

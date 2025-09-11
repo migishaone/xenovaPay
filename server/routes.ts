@@ -59,7 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const config = await callPawaPayAPI(endpoint);
       res.json(config);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(prediction);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -131,14 +131,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } catch (apiError) {
         // Update transaction with error
+        const errorMsg = apiError instanceof Error ? apiError.message : 'Unknown API error';
         await storage.updateTransaction(depositId, {
           status: 'FAILED',
-          errorMessage: apiError.message
+          errorMessage: errorMsg
         });
 
         res.status(500).json({
           transactionId: depositId,
-          error: apiError.message
+          error: errorMsg
         });
       }
     } catch (error) {
@@ -183,6 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         };
 
+        console.log('PawaPay payout request:', JSON.stringify(pawaPayRequest, null, 2));
         const pawaPayResponse = await callPawaPayAPI('/payouts', 'POST', pawaPayRequest);
         
         // Update transaction with response

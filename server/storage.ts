@@ -56,6 +56,7 @@ export class MemStorage implements IStorage {
     const now = new Date();
     const transaction: Transaction = {
       ...insertTransaction,
+      description: insertTransaction.description || null,
       created: now,
       updated: now,
     };
@@ -97,7 +98,11 @@ export class MemStorage implements IStorage {
 
   async createProvider(insertProvider: InsertProvider): Promise<Provider> {
     const id = randomUUID();
-    const provider: Provider = { ...insertProvider, id };
+    const provider: Provider = { 
+      ...insertProvider, 
+      id,
+      logo: insertProvider.logo || null 
+    };
     this.providers.set(provider.code, provider);
     return provider;
   }

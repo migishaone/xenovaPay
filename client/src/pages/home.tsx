@@ -15,6 +15,7 @@ interface Country {
   name: string;
   currency: string;
   prefix: string;
+  flag?: string;
 }
 
 export default function Home() {
@@ -89,11 +90,11 @@ export default function Home() {
 
               <div className="mt-6">
                 <TabsContent value="deposits" data-testid="deposits-content">
-                  <DepositForm country={selectedCountry} providers={providers} />
+                  <DepositForm country={selectedCountry} providers={Array.isArray(providers) ? providers : []} />
                 </TabsContent>
 
                 <TabsContent value="payouts" data-testid="payouts-content">
-                  <PayoutForm country={selectedCountry} providers={providers} />
+                  <PayoutForm country={selectedCountry} providers={Array.isArray(providers) ? providers : []} />
                 </TabsContent>
 
                 <TabsContent value="transactions" data-testid="transactions-content">
