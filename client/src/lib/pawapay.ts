@@ -106,4 +106,15 @@ export const pawaPayService = {
     const response = await apiRequest('GET', `/api/providers/${country}`);
     return response.json();
   },
+
+  async initiateHostedPayment(data: {
+    phoneNumber: string;
+    amount: string;
+    currency: string;
+    description?: string;
+    country: string;
+  }): Promise<{ transactionId: string; redirectUrl: string }> {
+    const response = await apiRequest('POST', '/api/hosted-payment', data);
+    return response.json();
+  },
 };

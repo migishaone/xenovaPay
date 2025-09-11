@@ -10,11 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { pawaPayService } from "@/lib/pawapay";
-import { NotebookPen } from "lucide-react";
+import { NotebookPen, ExternalLink } from "lucide-react";
 
 const depositSchema = z.object({
   phoneNumber: z.string().min(9, "Phone number must be at least 9 digits"),
-  provider: z.string().min(1, "Please select a provider"),
+  provider: z.string().optional(),
   amount: z.string().min(1, "Amount is required").refine(val => !isNaN(Number(val)) && Number(val) > 0, "Amount must be a positive number"),
   description: z.string().optional(),
 });
@@ -35,6 +35,7 @@ export function DepositForm({ country, providers }: DepositFormProps) {
   const [transactionId, setTransactionId] = useState<string>('');
   const [status, setStatus] = useState<string>('Ready');
   const [response, setResponse] = useState<string>('{\n  "message": "Click \'Initiate Deposit\' to see API response"\n}');
+  const [paymentMode, setPaymentMode] = useState<'direct' | 'hosted'>('direct');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -75,49 +76,81 @@ export function DepositForm({ country, providers }: DepositFormProps) {
       
       const fullPhoneNumber = country.prefix + data.phoneNumber.replace(/\D/g, '');
       
-      return pawaPayService.initiateDeposit({
-        phoneNumber: fullPhoneNumber,
-        provider: data.provider,
-        amount: data.amount,
-        currency: country.currency,
-        description: data.description,
-      });
+      if (paymentMode === 'hosted') {
+        return pawaPayService.initiateHostedPayment({
+          phoneNumber: fullPhoneNumber,
+          amount: data.amount,
+          currency: country.currency,
+          description: data.description,
+          country: country.code,
+        });
+      } else {
+        return pawaPayService.initiateDeposit({
+          phoneNumber: fullPhoneNumber,
+          provider: data.provider,
+          amount: data.amount,
+          currency: country.currency,
+          description: data.description,
+        });
+      }
     },
     onSuccess: (data) => {
       setTransactionId(data.transactionId);
-      setStatus(data.status || 'ACCEPTED');
-      setResponse(JSON.stringify(data, null, 2));
       queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
       
-      toast({
-        title: "Deposit Initiated",
-        description: `Transaction ID: ${data.transactionId}`,
-      });
-
-      // Poll for status updates
-      if (data.transactionId) {
-        const pollStatus = () => {
-          pawaPayService.checkDepositStatus(data.transactionId)
-            .then((statusData) => {
-              setStatus(statusData.status);
-              setResponse(JSON.stringify(statusData, null, 2));
-              
-              if (statusData.status === 'COMPLETED' || statusData.status === 'FAILED') {
-                queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
-                return;
-              }
-              
-              // Continue polling if still pending
-              if (statusData.status === 'PENDING' || statusData.status === 'ACCEPTED') {
-                setTimeout(pollStatus, 3000);
-              }
-            })
-            .catch(() => {
-              // Stop polling on error
-            });
-        };
+      if (paymentMode === 'hosted' && 'redirectUrl' in data) {
+        // Redirect to PawaPay hosted payment page
+        setStatus('REDIRECTING');
+        setResponse(JSON.stringify({ 
+          message: "Redirecting to PawaPay payment page...",
+          transactionId: data.transactionId,
+          redirectUrl: data.redirectUrl
+        }, null, 2));
         
-        setTimeout(pollStatus, 2000);
+        toast({
+          title: "Redirecting to Payment Page",
+          description: `Transaction ID: ${data.transactionId}`,
+        });
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          window.location.href = data.redirectUrl;
+        }, 1500);
+      } else {
+        // Direct API mode
+        setStatus(data.status || 'ACCEPTED');
+        setResponse(JSON.stringify(data, null, 2));
+        
+        toast({
+          title: "Deposit Initiated",
+          description: `Transaction ID: ${data.transactionId}`,
+        });
+
+        // Poll for status updates
+        if (data.transactionId) {
+          const pollStatus = () => {
+            pawaPayService.checkDepositStatus(data.transactionId)
+              .then((statusData) => {
+                setStatus(statusData.status);
+                setResponse(JSON.stringify(statusData, null, 2));
+                
+                if (statusData.status === 'COMPLETED' || statusData.status === 'FAILED') {
+                  queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+                  return;
+                }
+                
+                // Continue polling if still pending
+                if (statusData.status === 'PENDING' || statusData.status === 'ACCEPTED') {
+                  setTimeout(pollStatus, 3000);
+                }
+              })
+              .catch(() => {
+                // Stop polling on error
+              });
+          };
+          
+          setTimeout(pollStatus, 2000);
+        }
       }
     },
     onError: (error) => {
@@ -152,6 +185,44 @@ export function DepositForm({ country, providers }: DepositFormProps) {
       <Card data-testid="deposit-form">
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Test Deposit</h3>
+          
+          {/* Payment Mode Selection */}
+          <div className="mb-6">
+            <Label>Payment Mode</Label>
+            <div className="flex space-x-4 mt-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMode('direct')}
+                className={`flex-1 p-3 rounded-lg border text-sm font-medium ${
+                  paymentMode === 'direct'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-foreground border-border hover:bg-muted'
+                }`}
+              >
+                <NotebookPen className="inline mr-2 h-4 w-4" />
+                Direct API
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMode('hosted')}
+                className={`flex-1 p-3 rounded-lg border text-sm font-medium ${
+                  paymentMode === 'hosted'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-foreground border-border hover:bg-muted'
+                }`}
+              >
+                <ExternalLink className="inline mr-2 h-4 w-4" />
+                Hosted Page
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {paymentMode === 'hosted' 
+                ? 'Redirect to PawaPay\'s payment page for completion'
+                : 'Process payment directly via API calls'
+              }
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <Label htmlFor="deposit-phone">Phone Number</Label>
@@ -176,30 +247,32 @@ export function DepositForm({ country, providers }: DepositFormProps) {
               )}
             </div>
 
-            <div>
-              <Label htmlFor="deposit-provider">Provider</Label>
-              <Select 
-                onValueChange={(value) => setValue("provider", value)}
-                disabled={!country || providers.length === 0}
-              >
-                <SelectTrigger data-testid="select-deposit-provider">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.map((provider) => (
-                    <SelectItem key={provider.code} value={provider.code}>
-                      {provider.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-green-600">
-                <i className="fas fa-magic mr-1"></i>Provider will be auto-predicted
-              </p>
-              {errors.provider && (
-                <p className="mt-1 text-xs text-destructive">{errors.provider.message}</p>
-              )}
-            </div>
+            {paymentMode === 'direct' && (
+              <div>
+                <Label htmlFor="deposit-provider">Provider</Label>
+                <Select 
+                  onValueChange={(value) => setValue("provider", value)}
+                  disabled={!country || providers.length === 0}
+                >
+                  <SelectTrigger data-testid="select-deposit-provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providers.map((provider) => (
+                      <SelectItem key={provider.code} value={provider.code}>
+                        {provider.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-green-600">
+                  <i className="fas fa-magic mr-1"></i>Provider will be auto-predicted
+                </p>
+                {errors.provider && (
+                  <p className="mt-1 text-xs text-destructive">{errors.provider.message}</p>
+                )}
+              </div>
+            )}
 
             <div>
               <Label htmlFor="deposit-amount">Amount</Label>
@@ -242,8 +315,17 @@ export function DepositForm({ country, providers }: DepositFormProps) {
               className="w-full" 
               disabled={!country || isSubmitting}
             >
-              <NotebookPen className="mr-2 h-4 w-4" />
-              {isSubmitting ? 'Initiating...' : 'Initiate Deposit'}
+              {paymentMode === 'hosted' ? (
+                <ExternalLink className="mr-2 h-4 w-4" />
+              ) : (
+                <NotebookPen className="mr-2 h-4 w-4" />
+              )}
+              {isSubmitting 
+                ? 'Initiating...' 
+                : paymentMode === 'hosted' 
+                  ? 'Pay via PawaPay Page' 
+                  : 'Initiate Deposit'
+              }
             </Button>
           </form>
         </CardContent>
