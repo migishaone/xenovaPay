@@ -32,6 +32,24 @@ export default function Receipt() {
     } else {
       setLocation('/');
     }
+    
+    // Send completion message to parent window if opened in popup
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({
+          type: 'PAYMENT_COMPLETE',
+          status: 'COMPLETED',
+          transactionId: id
+        }, window.location.origin);
+        
+        // Close popup after a delay to show success animation
+        setTimeout(() => {
+          window.close();
+        }, 3000);
+      } catch (error) {
+        console.log('Failed to notify parent window:', error);
+      }
+    }
   }, [setLocation]);
 
   const { data: receiptData, isLoading, error } = useQuery<TransactionData>({

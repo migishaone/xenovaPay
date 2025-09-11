@@ -69,6 +69,29 @@ export const predictProviderRequestSchema = z.object({
   phoneNumber: z.string().min(10),
 });
 
+export const directPaymentRequestSchema = z.object({
+  phoneNumber: z.string()
+    .min(10, "Phone number must be at least 10 digits")
+    .regex(/^(\+250|250)?[0-9]{9}$/, "Phone number must be a valid Rwanda number (format: +250XXXXXXXXX or 250XXXXXXXXX or XXXXXXXXX)"),
+  amount: z.string()
+    .refine((val) => {
+      const num = parseFloat(val);
+      return !isNaN(num) && num >= 5;
+    }, "Amount must be at least 5 RWF"),
+  currency: z.literal("RWF", {
+    errorMap: () => ({ message: "Currency must be RWF for Rwanda direct payments" })
+  }),
+  country: z.literal("RWA", {
+    errorMap: () => ({ message: "Country must be RWA for Rwanda direct payments" })
+  }),
+  description: z.string()
+    .min(4, "Description must be at least 4 characters")
+    .max(22, "Description must be 22 characters or less")
+    .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
+    .optional(),
+});
+
 export type DepositRequest = z.infer<typeof depositRequestSchema>;
 export type PayoutRequest = z.infer<typeof payoutRequestSchema>;
 export type PredictProviderRequest = z.infer<typeof predictProviderRequestSchema>;
+export type DirectPaymentRequest = z.infer<typeof directPaymentRequestSchema>;

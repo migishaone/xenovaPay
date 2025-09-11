@@ -6,9 +6,11 @@ import {
   depositRequestSchema, 
   payoutRequestSchema, 
   predictProviderRequestSchema,
+  directPaymentRequestSchema,
   type DepositRequest,
   type PayoutRequest,
-  type PredictProviderRequest 
+  type PredictProviderRequest,
+  type DirectPaymentRequest 
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -229,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       try {
-        const pawaPayResponse = await callPawaPayAPI(`/deposits/${id}/status`);
+        const pawaPayResponse = await callPawaPayAPI(`/deposits/${id}`);
         
         // Update transaction if status changed
         if (pawaPayResponse.status !== transaction.status) {
@@ -264,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       try {
-        const pawaPayResponse = await callPawaPayAPI(`/payouts/${id}/status`);
+        const pawaPayResponse = await callPawaPayAPI(`/payouts/${id}`);
         
         // Update transaction if status changed
         if (pawaPayResponse.status !== transaction.status) {
@@ -325,7 +327,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create hosted payment page session
+  // Create direct payment (overlay experience) - DISABLED - Causes errors with unsupported parameters
+  /*
+  app.post('/api/direct-payment', async (req, res) => {
+    try {
+      // Validate request with Rwanda-specific rules
+      const validatedData = directPaymentRequestSchema.parse(req.body);
+      const depositId = randomUUID();
+
+      // Normalize phone number to international format
+      let normalizedPhone = validatedData.phoneNumber;
+      if (normalizedPhone.startsWith('250')) {
+        normalizedPhone = '+' + normalizedPhone;
+      } else if (!normalizedPhone.startsWith('+250')) {
+        normalizedPhone = '+250' + normalizedPhone;
+      }
+
+      try {
+        // First, predict the provider for this phone number
+        let predictedProvider = 'MTN_MOMO_RWA'; // fallback default
+        try {
+          const providerPrediction = await callPawaPayAPI('/predict-provider', 'POST', {
+            phoneNumber: normalizedPhone
+          });
+          if (providerPrediction.provider) {
+            predictedProvider = providerPrediction.provider;
+          }
+        } catch (providerError) {
+          console.log('Provider prediction failed, using default:', providerError instanceof Error ? providerError.message : 'Unknown error');
+        }
+
+        // Create transaction record
+        const transaction = await storage.createTransaction({
+          id: depositId,
+          type: 'DEPOSIT',
+          status: 'PENDING',
+          amount: validatedData.amount,
+          currency: validatedData.currency,
+          country: validatedData.country,
+          phoneNumber: normalizedPhone,
+          provider: predictedProvider,
+          description: validatedData.description || null,
+          pawapayResponse: null,
+          providerTransactionId: null,
+          errorMessage: null,
+        });
+
+        // Create direct deposit via PawaPay API
+        const depositRequest = {
+          depositId,
+          amount: validatedData.amount,
+          currency: validatedData.currency,
+          payer: {
+            type: 'MMO',
+            accountDetails: {
+              phoneNumber: normalizedPhone,
+              provider: predictedProvider
+            }
+          },
+          statementDescription: validatedData.description || 'Payment'
+        };
+
+        // Call PawaPay Direct API
+        const pawaPayResponse = await callPawaPayAPI('/deposits', 'POST', depositRequest);
+        
+        // Update transaction with response
+        await storage.updateTransaction(depositId, {
+          status: pawaPayResponse.status || 'PENDING',
+          pawapayResponse: JSON.stringify(pawaPayResponse),
+          providerTransactionId: pawaPayResponse.providerTransactionId
+        });
+
+        // Determine provider-specific instructions
+        const providerInstructions = predictedProvider.includes('MTN') 
+          ? { instructions: 'Check your phone for payment instructions from MTN', ussdCode: '*182*8*1#' }
+          : predictedProvider.includes('AIRTEL')
+          ? { instructions: 'Check your phone for payment instructions from Airtel', ussdCode: '*500#' }
+          : { instructions: 'Check your phone for payment instructions', ussdCode: null };
+
+        res.json({
+          transactionId: depositId,
+          status: pawaPayResponse.status || 'PENDING',
+          provider: predictedProvider,
+          ...providerInstructions,
+          estimatedTime: '1-2 minutes'
+        });
+
+      } catch (apiError) {
+        // Update transaction with error
+        const errorMsg = apiError instanceof Error ? apiError.message : 'Direct payment API error';
+        await storage.updateTransaction(depositId, {
+          status: 'FAILED',
+          errorMessage: errorMsg
+        });
+
+        res.status(500).json({
+          transactionId: depositId,
+          error: errorMsg
+        });
+      }
+    } catch (validationError) {
+      // Handle validation errors specifically
+      if (validationError instanceof Error && 'issues' in validationError) {
+        const zodError = validationError as any;
+        res.status(400).json({ 
+          error: 'Validation failed', 
+          details: zodError.issues.map((issue: any) => ({
+            field: issue.path.join('.'),
+            message: issue.message
+          }))
+        });
+      } else {
+        res.status(400).json({ error: validationError instanceof Error ? validationError.message : 'Invalid request data' });
+      }
+    }
+  });
+  */
+
+  // Payment status polling endpoint
+  app.get('/api/payment-status/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id || typeof id !== 'string') {
+        return res.status(400).json({ error: 'Invalid transaction ID' });
+      }
+
+      const transaction = await storage.getTransaction(id);
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      // Get latest status from PawaPay
+      try {
+        const statusResponse = await callPawaPayAPI(`/deposits/${id}`);
+        
+        // Update local transaction if status changed
+        if (statusResponse.status !== transaction.status) {
+          await storage.updateTransaction(id, {
+            status: statusResponse.status,
+            pawapayResponse: JSON.stringify(statusResponse),
+            providerTransactionId: statusResponse.providerTransactionId || transaction.providerTransactionId
+          });
+        }
+
+        res.json({
+          transactionId: id,
+          status: statusResponse.status,
+          providerTransactionId: statusResponse.providerTransactionId
+        });
+      } catch (apiError) {
+        // Return cached status if API call fails
+        res.json({
+          transactionId: id,
+          status: transaction.status,
+          providerTransactionId: transaction.providerTransactionId
+        });
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get payment status' });
+    }
+  });
+
+  // Create hosted payment page session (legacy)
   app.post('/api/hosted-payment', async (req, res) => {
     try {
       const { phoneNumber, amount, currency, description, country } = req.body;
@@ -414,7 +578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get the latest status from PawaPay
       try {
-        const statusResponse = await callPawaPayAPI(`/deposits/${depositId}/status`);
+        const statusResponse = await callPawaPayAPI(`/deposits/${depositId}`);
         
         await storage.updateTransaction(depositId, {
           status: statusResponse.status,
