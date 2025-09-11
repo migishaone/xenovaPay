@@ -514,7 +514,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { phoneNumber, amount, currency, description, country } = req.body;
       const depositId = randomUUID();
-      const returnUrl = `${req.protocol}://${req.get('host')}/payment-return?depositId=${depositId}`;
+      const returnUrl = `${BASE_URL}/payment-return?depositId=${depositId}`;
 
       // Create transaction record
       const transaction = await storage.createTransaction({
