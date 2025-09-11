@@ -15,10 +15,11 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Environment variables configuration
-  const API_BASE = process.env.PAWAPAY_API_BASE || "https://api.sandbox.pawapay.io/v2";
-  const WIDGET_API_BASE = process.env.PAWAPAY_WIDGET_API_BASE || "https://api.sandbox.pawapay.cloud/v1";
+  const PAWAPAY_API_URL = process.env.PAWAPAY_API_URL || "https://api.sandbox.pawapay.io";
+  const API_BASE = `${PAWAPAY_API_URL}/v2`;
+  const WIDGET_API_BASE = `${PAWAPAY_API_URL}/v1`;
   const rawApiToken = process.env.PAWAPAY_API_TOKEN || "your-api-token";
-  const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || '3000'}`;
+  const CLIENT_URL = process.env.CLIENT_URL || `http://localhost:${process.env.PORT || '3000'}`;
   const NODE_ENV = process.env.NODE_ENV || 'development';
   
   // Production safety: validate API token configuration
@@ -32,9 +33,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Log configuration in development
   if (NODE_ENV === 'development') {
     console.log('Environment Configuration:');
+    console.log('- PAWAPAY_API_URL:', PAWAPAY_API_URL);
     console.log('- API_BASE:', API_BASE);
     console.log('- WIDGET_API_BASE:', WIDGET_API_BASE);
-    console.log('- BASE_URL:', BASE_URL);
+    console.log('- CLIENT_URL:', CLIENT_URL);
     console.log('- API_TOKEN configured:', API_TOKEN !== 'your-api-token' ? 'Yes' : 'No (using placeholder)');
   }
 
@@ -514,7 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { phoneNumber, amount, currency, description, country } = req.body;
       const depositId = randomUUID();
-      const returnUrl = `${BASE_URL}/payment-return?depositId=${depositId}`;
+      const returnUrl = `${CLIENT_URL}/payment-return?depositId=${depositId}`;
 
       // Create transaction record
       const transaction = await storage.createTransaction({
