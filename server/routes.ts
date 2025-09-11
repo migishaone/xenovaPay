@@ -18,7 +18,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const API_BASE = process.env.PAWAPAY_API_BASE || "https://api.sandbox.pawapay.io/v2";
   const WIDGET_API_BASE = process.env.PAWAPAY_WIDGET_API_BASE || "https://api.sandbox.pawapay.cloud/v1";
   const rawApiToken = process.env.PAWAPAY_API_TOKEN || "your-api-token";
-  const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || '5000'}`;
+  const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || '3000'}`;
   const NODE_ENV = process.env.NODE_ENV || 'development';
   
   // Production safety: validate API token configuration
