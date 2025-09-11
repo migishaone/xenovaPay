@@ -17,7 +17,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Environment variables configuration
   const PAWAPAY_API_URL = process.env.PAWAPAY_API_URL || "https://api.sandbox.pawapay.io";
   const API_BASE = `${PAWAPAY_API_URL}/v2`;
-  const WIDGET_API_BASE = `${PAWAPAY_API_URL}/v1`;
+  
+  // Widget API uses .cloud domain, derive from main API URL
+  const WIDGET_API_BASE = PAWAPAY_API_URL.includes('sandbox') 
+    ? "https://api.sandbox.pawapay.cloud/v1"
+    : "https://api.pawapay.cloud/v1";
+    
   const rawApiToken = process.env.PAWAPAY_API_TOKEN || "your-api-token";
   const CLIENT_URL = process.env.CLIENT_URL || `http://localhost:${process.env.PORT || '3000'}`;
   const NODE_ENV = process.env.NODE_ENV || 'development';
