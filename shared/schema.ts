@@ -50,7 +50,10 @@ export const depositRequestSchema = z.object({
   provider: z.string(),
   amount: z.string(),
   currency: z.string(),
-  description: z.string().optional(),
+  description: z.string()
+    .max(22, "Description must be 22 characters or less")
+    .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
+    .optional(),
 });
 
 export const payoutRequestSchema = z.object({

@@ -2,13 +2,12 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { CountrySelector } from "@/components/country-selector";
 import { DepositForm } from "@/components/deposit-form";
 import { PayoutForm } from "@/components/payout-form";
 import { TransactionHistory } from "@/components/transaction-history";
 import { ThemeProvider } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { MoonIcon, SunIcon, DollarSignIcon, CheckCircle, XCircle } from "lucide-react";
+import { MoonIcon, SunIcon, DollarSignIcon, CheckCircle, XCircle, ArrowDownIcon, ArrowUpIcon, ListIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Country {
@@ -19,15 +18,21 @@ interface Country {
   flag?: string;
 }
 
+const RWANDA: Country = {
+  code: 'RWA',
+  name: 'Rwanda',
+  currency: 'RWF',
+  prefix: '250',
+  flag: '🇷🇼'
+};
+
 export default function Home() {
-  const [selectedCountry, setSelectedCountry] = useState<Country>();
-  const [currentTab, setCurrentTab] = useState<string>('deposits');
+  const [currentTab, setCurrentTab] = useState<string>('receive');
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const { toast } = useToast();
 
   const { data: providers = [] } = useQuery({
-    queryKey: ['/api/providers', selectedCountry?.code],
-    enabled: !!selectedCountry?.code,
+    queryKey: ['/api/providers', RWANDA.code],
   });
 
   // Handle payment return from hosted page
@@ -75,16 +80,16 @@ export default function Home() {
                   <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                     <DollarSignIcon className="h-5 w-5 text-primary-foreground" />
                   </div>
-                  <h1 className="text-xl font-bold text-foreground">Xenova Money</h1>
+                  <h1 className="text-xl font-bold text-foreground">Xenova Pay</h1>
                 </div>
                 <span className="text-sm text-muted-foreground border-l pl-4">
-                  PawaPay Testing Interface
+                  Mobile Money Payments
                 </span>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                  <span>Sandbox Mode</span>
+                  <span>Rwanda</span>
                 </div>
                 <Button variant="ghost" size="icon" data-testid="button-theme-toggle">
                   <SunIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -98,13 +103,6 @@ export default function Home() {
 
         {/* Main Content */}
         <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          {/* Country Selection */}
-          <div className="mb-8">
-            <CountrySelector 
-              onCountrySelect={setSelectedCountry}
-              selectedCountry={selectedCountry}
-            />
-          </div>
 
           {/* Payment Result Display */}
           {paymentResult && (
@@ -142,31 +140,31 @@ export default function Home() {
             </Card>
           )}
 
-          {/* Testing Interface Tabs */}
+          {/* Payment Interface */}
           <div className="mb-8">
-            <Tabs value={currentTab} onValueChange={setCurrentTab} data-testid="testing-tabs">
+            <Tabs value={currentTab} onValueChange={setCurrentTab} data-testid="payment-tabs">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="deposits" data-testid="tab-deposits">
+                <TabsTrigger value="receive" data-testid="tab-receive">
                   <ArrowDownIcon className="mr-2 h-4 w-4" />
-                  Deposits (Collect)
+                  Receive Payments
                 </TabsTrigger>
                 <TabsTrigger value="payouts" data-testid="tab-payouts">
                   <ArrowUpIcon className="mr-2 h-4 w-4" />
-                  Payouts (Send)
+                  Send Payouts
                 </TabsTrigger>
                 <TabsTrigger value="transactions" data-testid="tab-transactions">
                   <ListIcon className="mr-2 h-4 w-4" />
-                  History
+                  Transaction History
                 </TabsTrigger>
               </TabsList>
 
               <div className="mt-6">
-                <TabsContent value="deposits" data-testid="deposits-content">
-                  <DepositForm country={selectedCountry} providers={Array.isArray(providers) ? providers : []} />
+                <TabsContent value="receive" data-testid="receive-content">
+                  <DepositForm country={RWANDA} providers={Array.isArray(providers) ? providers : []} />
                 </TabsContent>
 
                 <TabsContent value="payouts" data-testid="payouts-content">
-                  <PayoutForm country={selectedCountry} providers={Array.isArray(providers) ? providers : []} />
+                  <PayoutForm country={RWANDA} providers={Array.isArray(providers) ? providers : []} />
                 </TabsContent>
 
                 <TabsContent value="transactions" data-testid="transactions-content">
@@ -176,56 +174,8 @@ export default function Home() {
             </Tabs>
           </div>
 
-          {/* API Documentation Quick Reference */}
-          <Card className="mt-12" data-testid="api-reference">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">API Quick Reference</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-medium text-foreground mb-2">Sandbox Endpoints</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-mono text-xs bg-muted px-2 py-1 rounded">POST</span>
-                      <span className="text-muted-foreground">api.sandbox.pawapay.io/v2/deposits</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-mono text-xs bg-muted px-2 py-1 rounded">POST</span>
-                      <span className="text-muted-foreground">api.sandbox.pawapay.io/v2/payouts</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-mono text-xs bg-muted px-2 py-1 rounded">GET</span>
-                      <span className="text-muted-foreground">api.sandbox.pawapay.io/v2/active-conf</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="font-medium text-foreground mb-2">Test Phone Numbers</h4>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div>Rwanda: +250783456789</div>
-                    <div>Uganda: +256701234567</div>
-                    <div>Kenya: +254701234567</div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border">
-                <a 
-                  href="https://docs.pawapay.io/v2/docs" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80 text-sm font-medium"
-                  data-testid="link-documentation"
-                >
-                  <i className="fas fa-external-link-alt mr-1"></i>
-                  View Full API Documentation
-                </a>
-              </div>
-            </CardContent>
-          </Card>
         </main>
       </div>
     </ThemeProvider>
   );
 }
-
-// Import missing icons
-import { ArrowDownIcon, ArrowUpIcon, ListIcon } from "lucide-react";
