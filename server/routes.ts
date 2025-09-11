@@ -14,9 +14,29 @@ import {
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Environment variables configuration
   const API_BASE = process.env.PAWAPAY_API_BASE || "https://api.sandbox.pawapay.io/v2";
-  const WIDGET_API_BASE = "https://api.sandbox.pawapay.cloud/v1";
-  const API_TOKEN = process.env.PAWAPAY_API_TOKEN || "your-api-token";
+  const WIDGET_API_BASE = process.env.PAWAPAY_WIDGET_API_BASE || "https://api.sandbox.pawapay.cloud/v1";
+  const rawApiToken = process.env.PAWAPAY_API_TOKEN || "your-api-token";
+  const BASE_URL = process.env.BASE_URL || `http://localhost:${process.env.PORT || '5000'}`;
+  const NODE_ENV = process.env.NODE_ENV || 'development';
+  
+  // Production safety: validate API token configuration
+  if (NODE_ENV === 'production' && (rawApiToken === 'your-api-token' || !rawApiToken)) {
+    throw new Error('PAWAPAY_API_TOKEN must be properly configured in production environment');
+  }
+  
+  // Normalize API token - handle both formats (with and without "Bearer " prefix)
+  const API_TOKEN = rawApiToken.startsWith('Bearer ') ? rawApiToken.substring(7) : rawApiToken;
+  
+  // Log configuration in development
+  if (NODE_ENV === 'development') {
+    console.log('Environment Configuration:');
+    console.log('- API_BASE:', API_BASE);
+    console.log('- WIDGET_API_BASE:', WIDGET_API_BASE);
+    console.log('- BASE_URL:', BASE_URL);
+    console.log('- API_TOKEN configured:', API_TOKEN !== 'your-api-token' ? 'Yes' : 'No (using placeholder)');
+  }
 
   // Helper function to make PawaPay API calls
   async function callPawaPayAPI(endpoint: string, method: string = 'GET', data?: any, useWidgetAPI: boolean = false) {
@@ -147,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -207,16 +227,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update transaction with error
         await storage.updateTransaction(payoutId, {
           status: 'FAILED',
-          errorMessage: apiError.message
+          errorMessage: apiError instanceof Error ? apiError.message : 'Unknown API error'
         });
 
         res.status(500).json({
           transactionId: payoutId,
-          error: apiError.message
+          error: apiError instanceof Error ? apiError.message : 'Unknown API error'
         });
       }
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -247,11 +267,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           transactionId: id,
           status: transaction.status,
-          error: apiError.message
+          error: apiError instanceof Error ? apiError.message : 'Unknown API error'
         });
       }
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -282,11 +302,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           transactionId: id,
           status: transaction.status,
-          error: apiError.message
+          error: apiError instanceof Error ? apiError.message : 'Unknown API error'
         });
       }
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -296,7 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transactions = await storage.getAllTransactions();
       res.json(transactions);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -312,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(transaction);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -323,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const providers = await storage.getProvidersByCountry(country);
       res.json(providers);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -525,7 +545,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           reason: description || 'Payment'
         };
 
-        console.log('Creating widget session:', JSON.stringify(sessionRequest, null, 2));
+        // Creating widget session (PII removed from logs for security)
+        console.log('Creating widget session for depositId:', depositId, '- amount:', amount, currency);
         const sessionResponse = await callPawaPayAPI('/widget/sessions', 'POST', sessionRequest, true);
         
         // Update transaction with session info
