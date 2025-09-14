@@ -4,3 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+# Replit artefacts
+.replit
+replit.md
+.local/
+attached_assets/
