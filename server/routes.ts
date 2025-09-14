@@ -4,14 +4,23 @@ import { storage } from "./storage";
 import { randomUUID } from "crypto";
 import { 
   depositRequestSchema, 
-  payoutRequestSchema, 
   predictProviderRequestSchema,
   directPaymentRequestSchema,
   type DepositRequest,
-  type PayoutRequest,
   type PredictProviderRequest,
   type DirectPaymentRequest 
 } from "@shared/schema";
+
+class PawaPayError extends Error {
+  status: number;
+  body: any;
+  constructor(status: number, body: any, message?: string) {
+    super(message || `PawaPay API Error: ${status}`);
+    this.name = 'PawaPayError';
+    this.status = status;
+    this.body = body;
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Environment variables configuration
@@ -24,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     : "https://api.pawapay.cloud/v1";
     
   const rawApiToken = process.env.PAWAPAY_API_TOKEN || "your-api-token";
-  const CLIENT_URL = process.env.CLIENT_URL || `http://localhost:${process.env.PORT || '3000'}`;
+  const CLIENT_URL = (process.env.CLIENT_URL || `http://localhost:${process.env.PORT || '3000'}`).trim();
   const NODE_ENV = process.env.NODE_ENV || 'development';
   
   // Production safety: validate API token configuration
@@ -35,14 +44,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Normalize API token - handle both formats (with and without "Bearer " prefix)
   const API_TOKEN = rawApiToken.startsWith('Bearer ') ? rawApiToken.substring(7) : rawApiToken;
   
-  // Log configuration in development
-  if (NODE_ENV === 'development') {
+  // Optional: show configuration details only when explicitly enabled
+  if (process.env.LOG_STARTUP === 'true') {
     console.log('Environment Configuration:');
     console.log('- PAWAPAY_API_URL:', PAWAPAY_API_URL);
     console.log('- API_BASE:', API_BASE);
     console.log('- WIDGET_API_BASE:', WIDGET_API_BASE);
     console.log('- CLIENT_URL:', CLIENT_URL);
     console.log('- API_TOKEN configured:', API_TOKEN !== 'your-api-token' ? 'Yes' : 'No (using placeholder)');
+  }
+
+  // Helper to construct a valid absolute HTTPS return URL for PawaPay
+  function buildReturnUrl(req: import('express').Request, depositId: string): string {
+    let base = CLIENT_URL;
+
+    // If CLIENT_URL is missing a protocol, default to https
+    if (!/^https?:\/\//i.test(base)) {
+      base = `https://${base}`;
+    }
+
+    // If running on localhost, allow http; otherwise, enforce https
+    const isLocalhost = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?/i.test(base);
+    if (!isLocalhost) {
+      base = base.replace(/^http:\/\//i, 'https://');
+    }
+
+    // Remove trailing slash to avoid double slashes
+    base = base.replace(/\/$/, '');
+
+    const urlString = `${base}/payment-return?depositId=${encodeURIComponent(depositId)}`;
+
+    // Validate URL format
+    try {
+      // eslint-disable-next-line no-new
+      new URL(urlString);
+      return urlString;
+    } catch {
+      // Fallback to request-derived origin
+      const origin = `${req.protocol}://${req.get('host')}`;
+      const safeOrigin = origin.startsWith('http://localhost') ? origin : origin.replace(/^http:\/\//i, 'https://');
+      return `${safeOrigin.replace(/\/$/, '')}/payment-return?depositId=${encodeURIComponent(depositId)}`;
+    }
   }
 
   // Helper function to make PawaPay API calls
@@ -66,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const responseData = await response.json();
       
       if (!response.ok) {
-        throw new Error(`PawaPay API Error: ${response.status} - ${JSON.stringify(responseData)}`);
+        throw new PawaPayError(response.status, responseData, `PawaPay API Error: ${response.status}`);
       }
       
       return responseData;
@@ -114,6 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = depositRequestSchema.parse(req.body);
       const depositId = randomUUID();
+      const safeDescription = (validatedData.description && validatedData.description.trim()) ? validatedData.description.trim() : 'payment';
 
       // Create transaction record
       const transaction = await storage.createTransaction({
@@ -125,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         country: '', // Will be updated from PawaPay response
         phoneNumber: validatedData.phoneNumber,
         provider: validatedData.provider,
-        description: validatedData.description,
+        description: safeDescription,
         pawapayResponse: null,
         providerTransactionId: null,
         errorMessage: null,
@@ -178,74 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initiate payout
-  app.post('/api/payouts', async (req, res) => {
-    try {
-      const validatedData = payoutRequestSchema.parse(req.body);
-      const payoutId = randomUUID();
-
-      // Create transaction record
-      const transaction = await storage.createTransaction({
-        id: payoutId,
-        type: 'PAYOUT',
-        status: 'PENDING',
-        amount: validatedData.amount,
-        currency: validatedData.currency,
-        country: '', // Will be updated from PawaPay response
-        phoneNumber: validatedData.phoneNumber,
-        provider: validatedData.provider,
-        description: validatedData.description,
-        pawapayResponse: null,
-        providerTransactionId: null,
-        errorMessage: null,
-      });
-
-      try {
-        // Call PawaPay API
-        const pawaPayRequest = {
-          payoutId,
-          amount: validatedData.amount,
-          currency: validatedData.currency,
-          recipient: {
-            type: 'MMO',
-            accountDetails: {
-              phoneNumber: validatedData.phoneNumber,
-              provider: validatedData.provider
-            }
-          }
-        };
-
-        // Removed PII logging for security - payout request submitted
-        const pawaPayResponse = await callPawaPayAPI('/payouts', 'POST', pawaPayRequest);
-        
-        // Update transaction with response
-        await storage.updateTransaction(payoutId, {
-          status: pawaPayResponse.status,
-          pawapayResponse: JSON.stringify(pawaPayResponse),
-          country: pawaPayResponse.country || ''
-        });
-
-        res.json({
-          transactionId: payoutId,
-          ...pawaPayResponse
-        });
-
-      } catch (apiError) {
-        // Update transaction with error
-        await storage.updateTransaction(payoutId, {
-          status: 'FAILED',
-          errorMessage: apiError instanceof Error ? apiError.message : 'Unknown API error'
-        });
-
-        res.status(500).json({
-          transactionId: payoutId,
-          error: apiError instanceof Error ? apiError.message : 'Unknown API error'
-        });
-      }
-    } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  });
+  // Payout functionality removed
 
   // Check deposit status
   app.get('/api/deposits/:id/status', async (req, res) => {
@@ -282,40 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check payout status
-  app.get('/api/payouts/:id/status', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const transaction = await storage.getTransaction(id);
-      
-      if (!transaction) {
-        return res.status(404).json({ error: 'Transaction not found' });
-      }
-
-      try {
-        const pawaPayResponse = await callPawaPayAPI(`/payouts/${id}`);
-        
-        // Update transaction if status changed
-        if (pawaPayResponse.status !== transaction.status) {
-          await storage.updateTransaction(id, {
-            status: pawaPayResponse.status,
-            pawapayResponse: JSON.stringify(pawaPayResponse),
-            providerTransactionId: pawaPayResponse.providerTransactionId
-          });
-        }
-
-        res.json(pawaPayResponse);
-      } catch (apiError) {
-        res.json({
-          transactionId: id,
-          status: transaction.status,
-          error: apiError instanceof Error ? apiError.message : 'Unknown API error'
-        });
-      }
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  });
+  // Payout status endpoint removed
 
   // Get all transactions
   app.get('/api/transactions', async (req, res) => {
@@ -520,8 +463,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/hosted-payment', async (req, res) => {
     try {
       const { phoneNumber, amount, currency, description, country } = req.body;
+      const safeDescription = (typeof description === 'string' && description.trim()) ? description.trim() : 'payment';
       const depositId = randomUUID();
-      const returnUrl = `${CLIENT_URL}/payment-return?depositId=${depositId}`;
+      const returnUrl = buildReturnUrl(req, depositId);
 
       // Create transaction record
       const transaction = await storage.createTransaction({
@@ -533,7 +477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         country: country,
         phoneNumber: phoneNumber,
         provider: '', // Will be selected on hosted page
-        description: description,
+        description: safeDescription,
         pawapayResponse: null,
         providerTransactionId: null,
         errorMessage: null,
@@ -544,16 +488,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionRequest = {
           depositId,
           returnUrl,
-          statementDescription: description || 'Payment',
+          statementDescription: safeDescription,
           amount: amount,
           msisdn: phoneNumber,
           language: 'EN',
           country: country,
-          reason: description || 'Payment'
+          reason: safeDescription
         };
 
-        // Creating widget session (PII removed from logs for security)
-        console.log('Creating widget session for depositId:', depositId, '- amount:', amount, currency);
+        // Creating widget session (PII removed)
+        if (NODE_ENV === 'development') {
+          console.log('Creating widget session for depositId:', depositId, '- amount:', amount, currency, '- returnUrl:', returnUrl);
+        }
         const sessionResponse = await callPawaPayAPI('/widget/sessions', 'POST', sessionRequest, true);
         
         // Update transaction with session info
@@ -615,11 +561,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           country: statusResponse.country || transaction.country
         });
 
-        // Redirect to appropriate page with only transaction ID (secure)
-        if (statusResponse.status === 'COMPLETED') {
-          res.redirect(`/receipt?id=${depositId}`);
-        } else {
+        // Redirect based on status: only FAILED goes to failure page.
+        // ACCEPTED/PENDING states will land on receipt page which will continue polling.
+        if (String(statusResponse.status).toUpperCase() === 'FAILED') {
           res.redirect(`/payment-failed?id=${depositId}`);
+        } else {
+          res.redirect(`/receipt?id=${depositId}`);
         }
       } catch (apiError) {
         console.log('PawaPay status check failed, treating as completed for sandbox:', apiError);

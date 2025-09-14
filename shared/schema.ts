@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey(),
-  type: text("type").notNull(), // 'DEPOSIT' | 'PAYOUT'
+  type: text("type").notNull(), // 'DEPOSIT'
   status: text("status").notNull(), // 'PENDING' | 'COMPLETED' | 'FAILED' | 'ACCEPTED'
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull(),
@@ -50,20 +50,23 @@ export const depositRequestSchema = z.object({
   provider: z.string(),
   amount: z.string(),
   currency: z.string(),
-  description: z.string()
-    .min(4, "Description must be at least 4 characters")
-    .max(22, "Description must be 22 characters or less")
-    .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
-    .optional(),
+  // Optional description; allow empty input by treating it as undefined
+  description: z.preprocess(
+    (v) => {
+      if (typeof v === 'string') {
+        const t = v.trim();
+        return t === '' ? undefined : t;
+      }
+      return v;
+    },
+    z.string()
+      .min(4, "Description must be at least 4 characters")
+      .max(22, "Description must be 22 characters or less")
+      .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
+      .optional()
+  ),
 });
 
-export const payoutRequestSchema = z.object({
-  phoneNumber: z.string().min(10),
-  provider: z.string(),
-  amount: z.string(),
-  currency: z.string(),
-  description: z.string().optional(),
-});
 
 export const predictProviderRequestSchema = z.object({
   phoneNumber: z.string().min(10),
@@ -92,6 +95,6 @@ export const directPaymentRequestSchema = z.object({
 });
 
 export type DepositRequest = z.infer<typeof depositRequestSchema>;
-export type PayoutRequest = z.infer<typeof payoutRequestSchema>;
+// Payout functionality removed
 export type PredictProviderRequest = z.infer<typeof predictProviderRequestSchema>;
 export type DirectPaymentRequest = z.infer<typeof directPaymentRequestSchema>;

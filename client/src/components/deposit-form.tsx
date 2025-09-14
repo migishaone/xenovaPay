@@ -10,17 +10,27 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { pawaPayService } from "@/lib/pawapay";
-import { NotebookPen, ExternalLink, CreditCard } from "lucide-react";
+import { CreditCard } from "lucide-react";
 
 const depositSchema = z.object({
   phoneNumber: z.string().min(9, "Phone number must be at least 9 digits"),
   provider: z.string().optional(),
   amount: z.string().min(1, "Amount is required").refine(val => !isNaN(Number(val)) && Number(val) >= 5, "Amount must be at least 5 RWF"),
-  description: z.string()
-    .min(4, "Description must be at least 4 characters")
-    .max(22, "Description must be 22 characters or less")
-    .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
-    .optional(),
+  // Make description optional; if provided, validate, otherwise allow empty
+  description: z.preprocess(
+    (v) => {
+      if (typeof v === 'string') {
+        const t = v.trim();
+        return t === '' ? undefined : t;
+      }
+      return v;
+    },
+    z.string()
+      .min(4, "Description must be at least 4 characters")
+      .max(22, "Description must be 22 characters or less")
+      .regex(/^[a-zA-Z0-9 ]*$/, "Description can only contain letters, numbers and spaces")
+      .optional()
+  ),
 });
 
 type DepositForm = z.infer<typeof depositSchema>;
@@ -37,6 +47,7 @@ interface DepositFormProps {
 export function DepositForm({ country }: DepositFormProps) {
   const [transactionId, setTransactionId] = useState<string>('');
   const [status, setStatus] = useState<string>('Ready');
+  // Popup flow state
   const [isPaymentInProgress, setIsPaymentInProgress] = useState(false);
   const [paymentPopup, setPaymentPopup] = useState<Window | null>(null);
   const { toast } = useToast();
@@ -66,20 +77,18 @@ export function DepositForm({ country }: DepositFormProps) {
         phoneNumber: fullPhoneNumber,
         amount: data.amount,
         currency: country.currency,
-        description: data.description,
+        description: (data.description && data.description.trim()) ? data.description.trim() : 'payment',
         country: country.code,
       });
     },
     onSuccess: (data) => {
       setTransactionId(data.transactionId);
       setStatus('PAYMENT_INITIATED');
-      
       toast({
         title: "Opening Payment Window",
         description: `Transaction ID: ${data.transactionId}`,
       });
-      
-      // Redirect popup to payment URL (popup was opened synchronously on form submit)
+      // Navigate popup to the hosted payment URL and begin monitoring
       if (paymentPopup && !paymentPopup.closed) {
         paymentPopup.location.href = data.redirectUrl;
         monitorPaymentPopup(paymentPopup, data.transactionId);
@@ -91,7 +100,6 @@ export function DepositForm({ country }: DepositFormProps) {
     onError: (error) => {
       setStatus('FAILED');
       setIsPaymentInProgress(false);
-      
       // Close popup if it was opened but API failed
       if (paymentPopup && !paymentPopup.closed) {
         paymentPopup.close();
@@ -106,14 +114,20 @@ export function DepositForm({ country }: DepositFormProps) {
     },
   });
 
-  // Popup monitoring logic
+  // Popup and monitoring logic — payment opens in popup and auto-closes, main tab redirects on completion
   const openPaymentPopup = (url: string, txId: string) => {
-    const popup = window.open(
-      url,
-      'pawapay-payment',
-      'width=450,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
-    );
-    
+    const defaultWidth = 480;
+    const defaultHeight = 720;
+    const width = Math.min(defaultWidth, Math.max(360, window.outerWidth - 40));
+    const height = Math.min(defaultHeight, Math.max(520, window.outerHeight - 80));
+    const left = (window.screenX || 0) + Math.max(0, Math.round((window.outerWidth - width) / 2));
+    const top = (window.screenY || 0) + Math.max(0, Math.round((window.outerHeight - height) / 2));
+
+    const features = `width=${width},height=${height},left=${left},top=${top},` +
+      `resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`;
+
+    const popup = window.open('about:blank', 'pawapay-payment', features);
+
     if (!popup) {
       toast({
         title: "Popup Blocked",
@@ -124,169 +138,137 @@ export function DepositForm({ country }: DepositFormProps) {
       setStatus('Ready');
       return;
     }
-    
+
+    // Write lightweight loading UI (responsive)
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Loading Payment...</title>
+          <meta name=viewport content="width=device-width, initial-scale=1" />
+          <style>
+            body{font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f7f7fb}
+            .wrap{max-width:320px;text-align:center}
+            .spinner{border:4px solid #e5e7eb;border-top:4px solid #7c3aed;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 16px}
+            h2{color:#111827;margin:0 0 6px}
+            p{color:#6b7280;margin:0}
+            @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+          </style>
+        </head>
+        <body>
+          <div class="wrap">
+            <div class="spinner"></div>
+            <h2>Loading payment…</h2>
+            <p>Please wait while we prepare your payment.</p>
+          </div>
+        </body>
+      </html>
+    `);
+
     setPaymentPopup(popup);
-    
-    // Monitor popup for messages and closure
     monitorPaymentPopup(popup, txId);
+    popup.location.replace(url);
   };
-  
+
   const monitorPaymentPopup = (popup: Window, txId: string) => {
-    let pollInterval: NodeJS.Timeout;
-    let isComplete = false;
-    
-    // Listen for postMessage from popup
+    let pollInterval: number | undefined;
+    let completed = false;
+
+    const redirectToReceipt = () => {
+      window.location.assign(`/receipt?id=${txId}`);
+    };
+    const redirectToFailed = () => {
+      window.location.assign(`/payment-failed?id=${txId}`);
+    };
+
     const messageListener = (event: MessageEvent) => {
-      // Verify origin for security
       if (event.origin !== window.location.origin) return;
-      
-      if (event.data.type === 'PAYMENT_COMPLETE' && event.data.transactionId === txId) {
-        handlePaymentComplete(event.data.status, event.data.transactionId);
-        isComplete = true;
-        popup.close();
-      } else if (event.data.type === 'PAYMENT_FAILED' && event.data.transactionId === txId) {
-        handlePaymentFailed(event.data.error || 'Payment failed', event.data.transactionId);
-        isComplete = true;
-        popup.close();
+      if (event.data?.type === 'PAYMENT_COMPLETE' && event.data?.transactionId === txId) {
+        completed = true;
+        try { popup.close(); } catch {}
+        redirectToReceipt();
+      } else if (event.data?.type === 'PAYMENT_FAILED' && event.data?.transactionId === txId) {
+        completed = true;
+        try { popup.close(); } catch {}
+        redirectToFailed();
       }
     };
-    
     window.addEventListener('message', messageListener);
-    
-    // Polling fallback in case postMessage doesn't work
-    pollInterval = setInterval(async () => {
+
+    const poll = async () => {
       try {
         if (popup.closed) {
-          if (!isComplete) {
-            // Popup closed without completion - check status via API
-            await checkTransactionStatus(txId);
+          if (!completed) {
+            // Final status check on close
+            const resp = await fetch(`/api/payment-status/${txId}`);
+            if (resp.ok) {
+              const data = await resp.json();
+              if (String(data.status).toUpperCase() === 'COMPLETED') return redirectToReceipt();
+            }
+            return redirectToFailed();
           }
-          cleanup();
           return;
         }
-        
-        // Poll transaction status
-        await checkTransactionStatus(txId);
-      } catch (error) {
-        // Popup is from different origin, can't access - continue polling
-      }
-    }, 3000);
-    
-    const cleanup = () => {
-      window.removeEventListener('message', messageListener);
-      if (pollInterval) clearInterval(pollInterval);
-      setPaymentPopup(null);
-    };
-    
-    // Auto-cleanup after 15 minutes
-    setTimeout(() => {
-      if (!isComplete && popup && !popup.closed) {
-        popup.close();
-        handlePaymentTimeout();
-      }
-      cleanup();
-    }, 15 * 60 * 1000);
-  };
-  
-  const checkTransactionStatus = async (txId: string) => {
-    try {
-      const response = await fetch(`/api/payment-status/${txId}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.status === 'COMPLETED') {
-          handlePaymentComplete(data.status, txId);
-          // Close popup when polling detects completion
-          if (paymentPopup && !paymentPopup.closed) {
-            paymentPopup.close();
+        const resp = await fetch(`/api/payment-status/${txId}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const s = String(data.status).toUpperCase();
+          if (s === 'COMPLETED') {
+            completed = true;
+            try { popup.close(); } catch {}
+            return redirectToReceipt();
           }
-        } else if (data.status === 'FAILED') {
-          handlePaymentFailed('Payment failed', txId);
-          // Close popup when polling detects failure
-          if (paymentPopup && !paymentPopup.closed) {
-            paymentPopup.close();
+          if (s === 'FAILED') {
+            completed = true;
+            try { popup.close(); } catch {}
+            return redirectToFailed();
           }
         }
+      } catch {}
+    };
+
+    pollInterval = window.setInterval(poll, 3000);
+
+    // Safety timeout after 15 minutes
+    window.setTimeout(() => {
+      if (!completed) {
+        try { popup.close(); } catch {}
+        redirectToFailed();
       }
-    } catch (error) {
-      console.log('Status check failed:', error);
-    }
-  };
-  
-  const handlePaymentComplete = (status: string, txId: string) => {
-    setStatus('COMPLETED');
-    setIsPaymentInProgress(false);
-    
-    toast({
-      title: "Payment Successful!",
-      description: `Your payment has been completed successfully.`,
-    });
-    
-    // Refresh transaction history
-    queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
-  };
-  
-  const handlePaymentFailed = (error: string, txId: string) => {
-    setStatus('FAILED');
-    setIsPaymentInProgress(false);
-    
-    toast({
-      title: "Payment Failed",
-      description: error,
-      variant: "destructive",
-    });
-  };
-  
-  const handlePaymentTimeout = () => {
-    setStatus('TIMEOUT');
-    setIsPaymentInProgress(false);
-    
-    toast({
-      title: "Payment Timeout",
-      description: "Payment window was closed. Please try again if payment was not completed.",
-      variant: "destructive",
-    });
+      if (pollInterval) window.clearInterval(pollInterval);
+      window.removeEventListener('message', messageListener);
+    }, 15 * 60 * 1000);
   };
 
   const onSubmit = (data: DepositForm) => {
     if (!country || isPaymentInProgress) return;
-    
-    // Open popup synchronously on user click to avoid popup blockers
-    const popup = window.open(
-      'about:blank',
-      'pawapay-payment',
-      'width=450,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
-    );
-    
+    setIsPaymentInProgress(true);
+
+    // Open a centered popup immediately (about:blank) to avoid blockers
+    const defaultWidth = 480;
+    const defaultHeight = 720;
+    const width = Math.min(defaultWidth, Math.max(360, window.outerWidth - 40));
+    const height = Math.min(defaultHeight, Math.max(520, window.outerHeight - 80));
+    const left = (window.screenX || 0) + Math.max(0, Math.round((window.outerWidth - width) / 2));
+    const top = (window.screenY || 0) + Math.max(0, Math.round((window.outerHeight - height) / 2));
+    const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`;
+    const popup = window.open('about:blank', 'pawapay-payment', features);
+
     if (!popup) {
       toast({
-        title: "Popup Blocked",
-        description: "Please allow popups for this site to complete payment",
-        variant: "destructive",
+        title: 'Popup Blocked',
+        description: 'Please allow popups for this site to complete payment',
+        variant: 'destructive',
       });
+      setIsPaymentInProgress(false);
       return;
     }
-    
-    // Set loading content in popup
-    popup.document.write(`
-      <html>
-        <head><title>Loading Payment...</title></head>
-        <body style="font-family: system-ui; text-align: center; padding: 50px; background: #f9fafb;">
-          <div style="max-width: 300px; margin: 0 auto;">
-            <div style="border: 4px solid #e5e7eb; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-            <h2 style="color: #374151; margin-bottom: 10px;">Loading Payment...</h2>
-            <p style="color: #6b7280; font-size: 14px;">Please wait while we prepare your payment.</p>
-          </div>
-          <style>
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          </style>
-        </body>
-      </html>
-    `);
-    
+
+    // Lightweight loading UI
+    popup.document.write('<html><head><title>Loading Payment...</title><meta name="viewport" content="width=device-width, initial-scale=1"/></head><body style="font-family: system-ui; text-align: center; padding: 50px; background: #f9fafb;"><div style="max-width: 300px; margin: 0 auto;"><div style="border: 4px solid #e5e7eb; border-top: 4px solid #7c3aed; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div><h2 style="color: #374151; margin-bottom: 10px;">Loading Payment...</h2><p style="color: #6b7280; font-size: 14px;">Please wait while we prepare your payment.</p></div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style></body></html>');
+
     setPaymentPopup(popup);
-    setIsPaymentInProgress(true);
-    
-    // Now make the API call
+
+    // Kick off the API call; onSuccess will navigate popup
     depositMutation.mutate(data);
   };
 
@@ -392,7 +374,7 @@ export function DepositForm({ country }: DepositFormProps) {
                 disabled={!country}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Min 4 chars. Only letters, numbers and spaces allowed
+                Optional. Up to 22 characters; letters, numbers, spaces
               </p>
               {errors.description && (
                 <p className="mt-1 text-xs text-destructive">{errors.description.message}</p>
@@ -407,8 +389,8 @@ export function DepositForm({ country }: DepositFormProps) {
             >
               <CreditCard className="mr-3 h-5 w-5" />
               <span>
-                {isPaymentInProgress 
-                  ? "Payment in Progress..." 
+                {isPaymentInProgress
+                  ? 'Payment in Progress...'
                   : depositMutation.isPending 
                   ? "Opening Payment..." 
                   : "Pay Now"

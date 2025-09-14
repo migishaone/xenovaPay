@@ -3,9 +3,9 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 async function buildClient() {
-  console.log("Building client without Replit dependencies...");
+  console.log("Building client...");
   
-  // Inline Vite config without Replit dependencies
+  // Inline Vite config for standalone build
   const standaloneConfig = {
     plugins: [react()],
     resolve: {

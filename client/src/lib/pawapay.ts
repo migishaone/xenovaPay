@@ -23,7 +23,6 @@ export interface Currency {
   displayName: string;
   operationTypes: {
     DEPOSIT?: OperationType;
-    PAYOUT?: OperationType;
   };
 }
 
@@ -54,7 +53,7 @@ export interface TransactionResponse {
 }
 
 export const pawaPayService = {
-  async getActiveConfig(country: string, operationType?: 'DEPOSIT' | 'PAYOUT'): Promise<{ countries: CountryConfig[] }> {
+  async getActiveConfig(country: string, operationType?: 'DEPOSIT'): Promise<{ countries: CountryConfig[] }> {
     const url = `/api/active-config/${country}${operationType ? `?operationType=${operationType}` : ''}`;
     const response = await apiRequest('GET', url);
     return response.json();
@@ -76,24 +75,8 @@ export const pawaPayService = {
     return response.json();
   },
 
-  async initiatePayout(data: {
-    phoneNumber: string;
-    provider: string;
-    amount: string;
-    currency: string;
-    description?: string;
-  }): Promise<TransactionResponse> {
-    const response = await apiRequest('POST', '/api/payouts', data);
-    return response.json();
-  },
-
   async checkDepositStatus(id: string): Promise<TransactionResponse> {
     const response = await apiRequest('GET', `/api/deposits/${id}/status`);
-    return response.json();
-  },
-
-  async checkPayoutStatus(id: string): Promise<TransactionResponse> {
-    const response = await apiRequest('GET', `/api/payouts/${id}/status`);
     return response.json();
   },
 

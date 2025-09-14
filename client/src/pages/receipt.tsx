@@ -22,6 +22,8 @@ interface TransactionData {
 export default function Receipt() {
   const [, setLocation] = useLocation();
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [autoPrinted, setAutoPrinted] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -56,6 +58,43 @@ export default function Receipt() {
     queryKey: ['/api/transactions', transactionId],
     enabled: !!transactionId,
   });
+
+  // Live status polling to reflect backend confirmation without user interaction
+  useEffect(() => {
+    if (!transactionId) return;
+    let timer: number | undefined;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/payment-status/${transactionId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const status = String(data.status || '').toUpperCase();
+        if (status) setLiveStatus(status);
+        if (status === 'COMPLETED' || status === 'FAILED') return; // stop polling
+      } catch {}
+      timer = window.setTimeout(poll, 2000);
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [transactionId]);
+
+  // Automatically trigger browser print dialog once when payment is confirmed
+  useEffect(() => {
+    const status = (liveStatus || receiptData?.status || '').toUpperCase();
+    if (!autoPrinted && status === 'COMPLETED') {
+      setAutoPrinted(true);
+      setTimeout(() => window.print(), 300);
+    }
+  }, [receiptData, liveStatus, autoPrinted]);
+
+  const effectiveStatus = (liveStatus || receiptData?.status || 'PENDING').toUpperCase();
 
   const handleDownload = () => {
     window.print();
@@ -97,15 +136,23 @@ export default function Receipt() {
       <div className="max-w-2xl mx-auto">
         {/* Success Header */}
         <div className="text-center mb-8 scale-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 mb-6 float-animation">
-            <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
-            Payment Successful!
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Your payment has been processed successfully
-          </p>
+          {effectiveStatus === 'COMPLETED' ? (
+            <>
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 mb-6 float-animation">
+                <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+              </div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+                Payment Successful!
+              </h1>
+              <p className="text-muted-foreground text-lg">Your payment has been processed successfully</p>
+            </>
+          ) : (
+            <>
+              <div className="animate-spin h-10 w-10 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-6"></div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Processing Payment…</h1>
+              <p className="text-muted-foreground text-lg">Just a moment while we confirm your payment</p>
+            </>
+          )}
         </div>
 
         {/* Receipt Card */}
@@ -119,7 +166,7 @@ export default function Receipt() {
               <div className="flex items-center justify-center space-x-2">
                 <Badge variant="outline" className="status-success text-white border-0">
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  {receiptData.status}
+                  {effectiveStatus}
                 </Badge>
               </div>
             </div>

@@ -64,7 +64,7 @@ export function TransactionHistory() {
             <div className="text-center py-12" data-testid="transactions-empty">
               <ReceiptIcon className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h4 className="text-lg font-medium text-foreground mb-2">No transactions yet</h4>
-              <p className="text-muted-foreground">Start testing deposits and payouts to see them here</p>
+              <p className="text-muted-foreground">Start testing deposits to see them here</p>
             </div>
           ) : (
             (transactions as any[]).map((transaction: any) => (
@@ -77,7 +77,7 @@ export function TransactionHistory() {
                   {getTransactionIcon(transaction.type)}
                   <div>
                     <p className="font-medium text-foreground" data-testid={`transaction-type-${transaction.id}`}>
-                      {transaction.type === 'DEPOSIT' ? 'Deposit' : 'Payout'}
+                      {transaction.type === 'DEPOSIT' ? 'Deposit' : 'Transaction'}
                     </p>
                     <p className="text-sm text-muted-foreground" data-testid={`transaction-phone-${transaction.id}`}>
                       {transaction.phoneNumber}

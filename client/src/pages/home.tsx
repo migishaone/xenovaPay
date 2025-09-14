@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { DepositForm } from "@/components/deposit-form";
-import { PayoutForm } from "@/components/payout-form";
 import { TransactionHistory } from "@/components/transaction-history";
 import { ThemeProvider } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { MoonIcon, SunIcon, DollarSignIcon, CheckCircle, XCircle, ArrowDownIcon, ArrowUpIcon, ListIcon } from "lucide-react";
+import { MoonIcon, SunIcon, DollarSignIcon, CheckCircle, XCircle, ArrowDownIcon, ListIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/ChatGPT Image Sep 12, 2025, 02_08_13 AM_1757623256298.png";
 
@@ -32,9 +30,7 @@ export default function Home() {
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const { toast } = useToast();
 
-  const { data: providers = [] } = useQuery({
-    queryKey: ['/api/providers', RWANDA.code],
-  });
+  // Note: Payout form removed; no provider queries needed here.
 
   // Handle payment return from hosted page
   useEffect(() => {
@@ -170,14 +166,10 @@ export default function Home() {
           {/* Payment Interface */}
           <div className="mb-8">
             <Tabs value={currentTab} onValueChange={setCurrentTab} data-testid="payment-tabs" className="slide-up">
-              <TabsList className="grid w-full grid-cols-3 glass-card p-2 h-14">
+              <TabsList className="grid w-full grid-cols-2 glass-card p-2 h-14">
                 <TabsTrigger value="receive" data-testid="tab-receive" className="tab-trigger data-[state=active]:gradient-button rounded-lg h-10 font-medium">
                   <ArrowDownIcon className="mr-2 h-4 w-4" />
                   Receive Payments
-                </TabsTrigger>
-                <TabsTrigger value="payouts" data-testid="tab-payouts" className="tab-trigger data-[state=active]:gradient-button rounded-lg h-10 font-medium">
-                  <ArrowUpIcon className="mr-2 h-4 w-4" />
-                  Send Payouts
                 </TabsTrigger>
                 <TabsTrigger value="transactions" data-testid="tab-transactions" className="tab-trigger data-[state=active]:gradient-button rounded-lg h-10 font-medium">
                   <ListIcon className="mr-2 h-4 w-4" />
@@ -190,9 +182,7 @@ export default function Home() {
                   <DepositForm country={RWANDA} />
                 </TabsContent>
 
-                <TabsContent value="payouts" data-testid="payouts-content" className="scale-in">
-                  <PayoutForm country={RWANDA} providers={Array.isArray(providers) ? providers : []} />
-                </TabsContent>
+                {/* Payout form removed */}
 
                 <TabsContent value="transactions" data-testid="transactions-content" className="scale-in">
                   <TransactionHistory />

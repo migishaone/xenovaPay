@@ -3,8 +3,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables without noisy debug output
+process.env.DOTENV_CONFIG_DEBUG = ""; // ensure dotenv debug logs are disabled
+dotenv.config({ debug: false });
 
 const app = express();
 app.use(express.json());
@@ -60,15 +61,12 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 3000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Serve on the port specified in the environment variable PORT
+  // Default to 3000 if not specified. This serves both the API and client.
   const port = parseInt(process.env.PORT || '3000', 10);
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
   });
